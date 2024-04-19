@@ -6,6 +6,9 @@ on:
       - main
 
 jobs:
+  job-name:
+    permissions:
+      contents: write
   build:
     runs-on: ubuntu-latest
     steps:
@@ -36,23 +39,43 @@ jobs:
         NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
         sed -i "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/" pubspec.yaml
     - name: Commit and push changes
+    - name: Extract current version
+      id: extract_version
+      run: |
+        VERSION=$(grep -oP 'version: \K[0-9.]+(\+\d+)?' pubspec.yaml)
+        echo "::set-output name=version::$VERSION"
+    - name: Increment version
+      id: increment_version
+      run: |
+        CURRENT_VERSION=${{ steps.extract_version.outputs.version }}
+        NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F '+' '{print $1"+"($NF+1)}')
+        echo "::set-output name=new_version::$NEW_VERSION"
+    - name: Update version in files
+      run: |
+        NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+        sed -i "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/" pubspec.yaml
+    - name: Commit and push changes
       run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'actions@users.noreply.github.com'
         git add pubspec.yaml
         git commit -m "Upgrade version to $NEW_VERSION"
         git push
+
     - name: Build Android APK
       run: flutter build apk --release
     
     - name: Rename APK
+      run: mv $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/demo_v${{ steps.increment_version.outputs.new_version }}.apk
       run: mv $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/app-release.apk $GITHUB_WORKSPACE/build/app/outputs/flutter-apk/demo_v${{ steps.increment_version.outputs.new_version }}.apk
     
     - name: Push APK to Releases
       uses: actions/upload-artifact@v2
       with:
         name: demo_v${{ steps.increment_version.outputs.new_version }}.apk
+        name: demo_v${{ steps.increment_version.outputs.new_version }}.apk
         path: |
+          ${{ github.workspace }}/build/app/outputs/flutter-apk/demo_v${{ steps.increment_version.outputs.new_version }}.apk
           ${{ github.workspace }}/build/app/outputs/flutter-apk/demo_v${{ steps.increment_version.outputs.new_version }}.apk
     
     - name: Create Release
@@ -61,6 +84,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.G_TOKEN }}
       with:
+        tag_name: v${{ steps.increment_version.outputs.new_version }}
+        release_name: Release ${{ steps.increment_version.outputs.new_version }}
         tag_name: v${{ steps.increment_version.outputs.new_version }}
         release_name: Release ${{ steps.increment_version.outputs.new_version }}
         draft: false
@@ -74,6 +99,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: build/app/outputs/flutter-apk/app-release.apk
+        asset_name: demo-release-${{ steps.increment_version.outputs.new_version }}.apk
         asset_name: demo-release-${{ steps.increment_version.outputs.new_version }}.apk
         asset_content_type: application/vnd.android.package-archive
    
