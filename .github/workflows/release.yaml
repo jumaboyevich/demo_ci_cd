@@ -42,7 +42,6 @@ jobs:
         git add pubspec.yaml
         git commit -m "Upgrade version to $NEW_VERSION"
         git push
-
     - name: Build Android APK
       run: flutter build apk --release
     
