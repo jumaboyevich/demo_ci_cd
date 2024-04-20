@@ -22,20 +22,25 @@ jobs:
     - run: flutter clean
     - run: flutter pub get
     
-    - name: Increment Version
+    - name: Increment version
       run: |
+        current_version=$(grep 'version: ' pubspec.yaml | awk '{print $2}')
+        echo "Current version is $current_version"
         # Increment version number
-        flutter pub bump
-        
-        # Get the updated version
-        version=$(grep 'version: ' pubspec.yaml | sed -e 's/[^0-9.]*\([0-9.]*\).*/\1/')
+        new_version=$(echo $current_version | awk -F '+' '{print $1}' | awk -F '.' '{printf "%d.%d.%d", $1, $2, $3 + 1}')
+        new_build_number=$(echo $current_version | awk -F '+' '{print $2 + 1}')
+        new_version_with_build="$new_version+$new_build_number"
+        echo "New version is $new_version_with_build"
+        # Update pubspec.yaml with new version
+        sed -i "s/version: $current_version/version: $new_version_with_build/g" pubspec.yaml
 
-        # Commit the changes
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add pubspec.yaml
-        git commit -m "Increment version to $version"
+    - name: Commit and push updated version
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@users.noreply.github.com'
+        git commit -am "Increment version to to $new_version_with_build"
         git push
+     
     # - name: Extract current version
     #   id: extract_version
     #   run: |
