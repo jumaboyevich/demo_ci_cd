@@ -1,4 +1,4 @@
-name: "Build and Create release"
+name: "Increment Version and Create release"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  job-name:
+  incrementVersion:
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -22,32 +22,52 @@ jobs:
     - run: flutter clean
     - run: flutter pub get
     
-    - name: Extract current version
-      id: extract_version
+    - name: Increment Version
       run: |
-        VERSION=$(grep -oP 'version: \K[0-9.]+(\+\d+)?' pubspec.yaml)
-        echo "::set-output name=version::$VERSION"
-    - name: Increment version
-      id: increment_version
-      run: |
-        CURRENT_VERSION=${{ steps.extract_version.outputs.version }}
-        NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F '+' '{print $1"+"($NF+1)}')
-        echo "::set-output name=new_version::$NEW_VERSION"
-    - name: Update version in files
-      run: |
-        NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
-        sed -i "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/" pubspec.yaml
+        # Increment version number
+        flutter pub bump
+        
+        # Get the updated version
+        version=$(grep 'version: ' pubspec.yaml | sed -e 's/[^0-9.]*\([0-9.]*\).*/\1/')
 
-    - name: Commit and push changes
-      run: |
-        git config --global user.name 'GitHub Actions'
-        git config --global user.email 'actions@users.noreply.github.com'
+        # Commit the changes
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
         git add pubspec.yaml
-        git commit -m "Upgrade version to $NEW_VERSION"
+        git commit -m "Increment version to $version"
         git push
+    # - name: Extract current version
+    #   id: extract_version
+    #   run: |
+    #     VERSION=$(grep -oP 'version: \K[0-9.]+(\+\d+)?' pubspec.yaml)
+    #     echo "::set-output name=version::$VERSION"
+    # - name: Increment version
+    #   id: increment_version
+    #   run: |
+    #     CURRENT_VERSION=${{ steps.extract_version.outputs.version }}
+    #     NEW_VERSION=$(echo "$CURRENT_VERSION" | awk -F '+' '{print $1"+"($NF+1)}')
+    #     echo "::set-output name=new_version::$NEW_VERSION"
+    # - name: Update version in files
+    #   run: |
+    #     NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+    #     sed -i "s/version: ${CURRENT_VERSION}/version: ${NEW_VERSION}/" pubspec.yaml
+
+    # - name: Commit and push changes
+    #   run: |
+    #     git config --global user.name 'GitHub Actions'
+    #     git config --global user.email 'actions@users.noreply.github.com'
+    #     git add pubspec.yaml
+    #     git commit -m "Upgrade version to $NEW_VERSION"
+    #     git push
+
+    # - name: Increment version
+    #     run: |
+    #       flutter pub get
+    #       flutter pub bump --major # Use --minor or --patch for minor or patch incrementations
+    #       flutter pub get
 
 
-  build:
+  createRelease:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
